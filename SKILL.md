@@ -1,107 +1,209 @@
 ---
 name: ms-todo-sync
 description: >
-  A CLI skill to manage Microsoft To Do tasks via Microsoft Graph API.
-  Supports listing, creating, completing, deleting, searching tasks and lists,
-  viewing overdue/today/pending tasks, and exporting data.
+  Microsoft To Do CLI tool (v2 optimized). Verb-noun command structure with short aliases, smart ID/title detection, quiet mode, and JSON output.
+  Key commands: list/ls, add/new, done/complete, remove/rm, view/info, find/search, today, overdue, pending/all, login
+example_prompts:
+  - "List all my task lists"
+  - "Add a task to buy milk to Shopping list"
+  - "Show tasks due today"
+  - "Mark a task as completed"
+  - "Search for tasks containing 'meeting'"
+  - "Search for incomplete tasks due this week"
 metadata:
-  version: 1.0.2
+  version: 2.0.0
   author: xiaoski@qq.com
   license: MIT License
   tags: [productivity, task-management, microsoft-todo, cli]
   category: productivity
 ---
 
-# ms-todo-sync
+# ms-todo-sync (v2)
 
-A Microsoft To Do command-line client for managing tasks and lists via Microsoft Graph API.
+Microsoft To Do command-line client, manages tasks and lists via Microsoft Graph API.
+
+**v2 New Features:**
+- ✅ Unified verb-noun command structure
+- ✅ Short aliases (`ls`, `rm`, `new`, etc.)
+- ✅ Smart task detection (ID or title auto-recognition)
+- ✅ Quiet mode (`-q/--quiet`) - ID only output
+- ✅ JSON output (`-j/--json`) - Machine-readable, consistent structure
+- ✅ More intuitive parameter names (`--note` instead of `--description`)
+- ✅ Powerful search filters (by status, date filtering)
+
+---
+
+## AGENT Quick Start - MUST READ
+
+### Command Cheat Sheet
+
+| Goal | Command | Alias |
+|------|---------|-------|
+| View all lists | `todo list` | `todo ls` |
+| Add task (default list) | `todo add "task title"` | `todo new` |
+| Add task to list | `todo add "task title" -l "list name"` | - |
+| View all pending tasks | `todo pending` | `todo all` |
+| View today's tasks | `todo today` | - |
+| View overdue tasks | `todo overdue` | - |
+| Search tasks | `todo find "keyword"` | `todo search` |
+| Filter incomplete | `todo find --incomplete` | - |
+| Complete task | `todo done <ID or title>` | `todo complete` |
+| Delete task (skip confirm) | `todo remove <ID or title> -y` | `todo rm` |
+
+### Agent Recommended Workflow
+
+Use ID-based operations for reliability:
+
+```
+1. cd <skill_directory> (must run all commands from SKILL.md directory)
+2. Check dependencies: uv sync (run if ModuleNotFoundError occurs)
+3. Verify login: todo list
+   - If "Not logged in" → run: todo login
+4. Get task IDs: todo -q pending (quiet mode, ID only)
+   or: todo -j pending (JSON format with details)
+5. Use ID for operations: todo done <id>, todo remove <id> -y, todo view <id>
+```
+
+### Login Flow
+
+```bash
+todo login
+```
+
+Single-step device code flow:
+1. Display verification code and URL
+2. Wait for user to complete in browser
+3. Press Enter to confirm
+
+**Note**: `login` is interactive - **do not use** with `-j` or `-q` options.
+
+### Task Categorization Suggestions
+
+Choose list based on context:
+- Work-related → "Work" list
+- Personal matters → "Personal" list
+- Shopping items → "Shopping" list
+- Project-specific → Use project name as list
+- User unspecified → Default list
+
+### Agent Key Rules
+
+⚠️ **Global options must come before subcommand**: `-q/-j/-v/--debug` must precede the command, e.g. `todo -j list`
+⚠️ **Smart task detection**: `done`/`remove`/`view` auto-detect ID or title
+⚠️ **Recommend ID usage**: Get ID first via `-q` or `-j`, then operate by ID
+⚠️ **Quiet mode**: `-q` outputs ID only, good for scripts and pipes
+⚠️ **JSON mode**: `-j` outputs structured data, recommended for agents
+⚠️ **Delete operations**: `remove`/`rm-list` confirms by default, use `-y` to skip
+⚠️ **Auto list creation**: Lists are auto-created if they don't exist when using `add`
+⚠️ **login command**: Interactive command, do not use with `-j/-q`
+
+---
 
 ## Prerequisites
 
-1. **Python >= 3.9** must be installed.
-2. **uv** (Python package manager) must be installed. Install via `pip install uv` or see https://docs.astral.sh/uv/.
-3. **Working directory**: All commands MUST be run from the root of this skill (the directory containing this SKILL.md file).
-4. **Network access**: Requires internet access to Microsoft Graph API endpoints.
-5. **Authentication**: First-time use requires interactive login via browser. See [Authentication](#authentication) section.
-   - **Token cache**: `~/.mstodo_token_cache.json` (persists across sessions, auto-refreshed)
-   - **Device flow cache**: `~/.mstodo_device_flow.json` (temporary)
+1. **Python >= 3.9**
+2. **[uv](https://docs.astral.sh/uv/)** - Python package manager: `pip install uv`
+3. **Working directory**: All commands must run in the directory containing SKILL.md
+4. **Network access**: Must access Microsoft Graph API
+5. **Authentication**: First use requires browser-based interactive login
 
-## Installation & Setup
+---
 
-### First-Time Setup
+## Installation
 
-Before using this skill for the first time, dependencies must be installed:
+### First Setup
 
 ```bash
-# Navigate to skill directory
 cd <path-to-ms-todo-sync>
-
-# Install dependencies using uv (recommended - creates isolated environment)
-uv sync
-
-# Alternative: Install dependencies with pip (uses global/active Python environment)
-pip install -r requirements.txt
+uv sync  # Install dependencies (recommended)
 ```
 
-**Dependencies:**
-- Requires `msal` (Microsoft Authentication Library) and `requests`
-- Specified in `requirements.txt`
-- `uv` creates an isolated virtual environment to avoid conflicts
-
-### Environment Verification
-
-After installation, verify the setup:
+### Verify Installation
 
 ```bash
-# Check if uv can find the script
-uv run scripts/ms-todo-sync.py --help
-
-# Expected: Command help text should be displayed
+todo --help
 ```
 
-**Troubleshooting:**
-- If `uv: command not found`, install uv: `pip install uv`
-- If `Python not found`, install Python 3.9 or higher from https://python.org
-- If script fails with import errors, ensure dependencies are installed: `uv sync` or `pip install -r requirements.txt`
-
-### Security Notes
-
-- Uses official Microsoft Graph API via Microsoft's `msal` library
-- All code is plain Python (.py files), readable and auditable
-- Tokens stored locally in `~/.mstodo_token_cache.json`
-- All API calls go directly to Microsoft endpoints
+---
 
 ## Command Reference
 
-All commands follow this pattern:
+All commands follow this format:
 
 ```
-uv run scripts/ms-todo-sync.py [GLOBAL_OPTIONS] <command> [COMMAND_OPTIONS]
+todo [GLOBAL_OPTIONS] <command> [COMMAND_OPTIONS]
 ```
 
 ### Global Options
 
 | Option | Description |
 |--------|-------------|
-| `-v, --verbose` | Show detailed information (IDs, dates, notes). **Must be placed BEFORE the subcommand.** |
-| `--debug` | Enable debug mode to display API requests and responses. Useful for troubleshooting. **Must be placed BEFORE the subcommand.** |
+| `-q, --quiet` | Quiet mode, output ID or errors only **must precede subcommand** |
+| `-j, --json` | JSON output (machine-readable) **must precede subcommand**, recommended for agents |
+| `-v, --verbose` | Show detailed info **must precede subcommand** |
+| `--debug` | Enable debug mode **must precede subcommand** |
 
-> ⚠️ **Common mistake**: Global options MUST come before the subcommand.
-> - ✅ `uv run scripts/ms-todo-sync.py -v lists`
-> - ✅ `uv run scripts/ms-todo-sync.py --debug add "Task"`
-> - ❌ `uv run scripts/ms-todo-sync.py lists -v`
+### JSON Output Format
+
+All commands support `-j/--json` with unified output format:
+
+```json
+{
+  "success": true,
+  "data": { ... },
+  "message": "optional message"
+}
+```
+
+**data field structure by command**:
+
+| Command | data field |
+|---------|-----------|
+| `list` | `{"total": N, "lists": [...]}` |
+| `pending` | `{"total": N, "tasks": [...]}` |
+| `today` | `{"total": N, "tasks": [...]}` |
+| `overdue` | `{"total": N, "tasks": [...]}` |
+| `find` | `{"keyword": "...", "filters": {...}, "total": N, "results": [...]}` |
+| `show` | `{"list": "...", "includeCompleted": bool, "total": N, "tasks": [...]}` |
+| `view` | The task object itself |
+| `add` | The created task object |
+| `done` | The completed task object |
+| `remove` | The deleted task object |
+| `list add` | The created list object |
+| `stats` | Statistics object |
+
+**Error response format**:
+```json
+{
+  "success": false,
+  "data": null,
+  "message": "error description"
+}
+```
+
+**Examples:**
+```bash
+# Get all lists in JSON
+todo -j list
+
+# Get pending tasks in JSON (includes task IDs)
+todo -j pending
+
+# Add task and get JSON response
+todo -j add "test task"
+```
 
 ---
 
-### Authentication
+### Authentication Commands
 
-Authentication uses a two-step device code flow designed for non-interactive/agent environments.
-
-#### `login get` — Get verification code
+#### `login` — Login (single-step)
 
 ```bash
-uv run scripts/ms-todo-sync.py login get
+todo login
 ```
+
+**Note**: This is an interactive command requiring browser login. **Do NOT** use with `-j` or `-q` options.
 
 **Output example:**
 ```
@@ -112,397 +214,289 @@ https://microsoft.com/devicelogin
 
 Enter verification code: ABC123XYZ
 
-Verify with command: ms-todo-sync.py login verify
+Press Enter after you have completed login in the browser...
 ```
 
-**Agent behavior**: Present the URL and verification code to the user. Wait for the user to confirm they have completed the browser login before proceeding.
-
-#### `login verify` — Complete login
+#### `logout` — Clear login info
 
 ```bash
-uv run scripts/ms-todo-sync.py login verify
+todo logout
 ```
 
-**Output on success:**
-```
-✓ Authentication successful! Login information saved, you will be logged in automatically next time.
-```
-
-**Output on failure:**
-```
-✗ Authentication failed: <error description>
-```
-
-> ⚠️ **This command blocks** until Microsoft's server confirms the user completed browser authentication. Do NOT run this until the user confirms they have completed the browser step.
-
-**Exit code**: 0 on success, 1 on failure.
-
-#### `logout` — Clear saved login
-
-```bash
-uv run scripts/ms-todo-sync.py logout
-```
-
-Only use when the user explicitly asks to switch accounts or clear login data. Under normal circumstances, the token is cached and login is automatic.
+Use only when user explicitly requests account switch or clearing login data.
 
 ---
 
 ### List Management
 
-#### `lists` — List all task lists
+#### `list` / `ls` — List all task lists
 
 ```bash
-uv run scripts/ms-todo-sync.py lists
-uv run scripts/ms-todo-sync.py -v lists  # with IDs and dates
+todo list
+todo ls  # alias
+todo -q list  # quiet mode, ID only
+todo -j list  # JSON format
+todo -v list  # detailed info
 ```
 
-**Output example:**
-```
-📋 Task Lists (3 total):
-
-1. Tasks
-2. Work
-3. Shopping
-```
-
-#### `create-list` — Create a new list
+#### `list add` / `new-list` — Create new list
 
 ```bash
-uv run scripts/ms-todo-sync.py create-list "<name>"
+todo list add "<name>"
+todo new-list "<name>"  # alias
 ```
 
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `name` | Yes | Name of the new list |
-
-Output: `✓ List created: <name>`
-
-#### `delete-list` — Delete a list
+#### `list remove` / `rm-list` — Delete list
 
 ```bash
-uv run scripts/ms-todo-sync.py delete-list "<name>" [-y]
+todo list remove "<name>" [-y]
+todo rm-list "<name>" [-y]  # alias
 ```
 
-| Argument/Option | Required | Description |
-|-----------------|----------|-------------|
-| `name` | Yes | Name of the list to delete |
-| `-y, --yes` | No | Skip confirmation prompt |
-
-> ⚠️ **This is a destructive operation**. Without `-y`, the command will prompt for confirmation. Consider asking the user before deleting important lists.
-
-Output: `✓ List deleted: <name>`
-
----
-
-### Task Operations
-
-#### `add` — Add a new task
-
-```bash
-uv run scripts/ms-todo-sync.py add "<title>" [options]
-```
-
-| Option | Required | Default | Description |
-|--------|----------|---------|-------------|
-| `title` | Yes | — | Task title (positional argument) |
-| `-l, --list` | No | (default list) | Target list name. If not specified, uses your Microsoft To Do default list. |
-| `-p, --priority` | No | `normal` | Priority: `low`, `normal`, `high` |
-| `-d, --due` | No | — | Due date. Accepts days from now (`3` or `3d`) or date (`2026-02-15`). **Note:** Only date is supported, not time. |
-| `-r, --reminder` | No | — | Reminder datetime. Formats: `3h` (hours), `2d` (days), `2026-02-15 14:30` (date+time with space, needs quotes), `2026-02-15T14:30:00` (ISO format), `2026-02-15` (date only, defaults to 09:00). |
-| `-R, --recurrence` | No | — | Recurrence pattern. Formats: `daily` (every day), `weekdays` (Mon-Fri), `weekly` (every week), `monthly` (every month). With interval: `daily:2` (every 2 days), `weekly:3` (every 3 weeks), `monthly:2` (every 2 months). **Note:** Automatically sets start date. |
-| `-D, --description` | No | — | Task description/notes |
-| `-t, --tags` | No | — | Comma-separated tags (e.g., `"work,urgent"`) |
-
-**Behavior:** If the specified list doesn't exist, it will be automatically created.
-
-**Output example:**
-```
-✓ List created: Work
-✓ Task added: Complete report
-```
-
-#### `complete` — Mark a task as completed
-
-```bash
-uv run scripts/ms-todo-sync.py complete "<title>" [-l "<list>"]
-```
-
-| Option | Required | Default | Description |
-|--------|----------|---------|-------------|
-| `title` | Yes | — | Exact task title |
-| `-l, --list` | No | (default list) | List name where the task resides. If not specified, uses your default list. |
-
-Output: `✓ Task completed: <title>`
-
-#### `delete` — Delete a task
-
-```bash
-uv run scripts/ms-todo-sync.py delete "<title>" [-l "<list>"] [-y]
-```
-
-| Option | Required | Default | Description |
-|--------|----------|---------|-------------|
-| `title` | Yes | — | Exact task title |
-| `-l, --list` | No | (default list) | List name. If not specified, uses your default list. |
-| `-y, --yes` | No | — | Skip confirmation prompt |
-
-> ⚠️ **This is a destructive operation**. Without `-y`, the command will prompt for confirmation. For routine cleanup or when user intent is clear, `-y` can be used to avoid blocking.
-
-Output: `✓ Task deleted: <title>`
+| Option | Description |
+|--------|-------------|
+| `-y, --yes` | Skip confirmation prompt |
 
 ---
 
 ### Task Views
 
-#### `tasks` — List tasks in a specific list
+#### `show` / `tasks` — Show tasks in a list
 
 ```bash
-uv run scripts/ms-todo-sync.py tasks "<list>" [-a]
+todo show              # Show default list tasks (incomplete only by default)
+todo show "<list>"     # Show tasks in specific list
+todo tasks             # alias
+todo show -a           # Include completed tasks
+todo -j show           # JSON format
+```
+
+| Option | Description |
+|--------|-------------|
+| `-a, --all` | Include completed tasks |
+
+---
+
+### Task Operations
+
+#### `add` / `new` — Add new task
+
+```bash
+todo add "<title>" [options]
+todo new "<title>" [options]  # alias
 ```
 
 | Option | Required | Default | Description |
 |--------|----------|---------|-------------|
-| `list` | Yes | — | List name (positional argument) |
-| `-a, --all` | No | — | Include completed tasks (default: only incomplete) |
+| `title` | Yes | - | Task title (positional arg) |
+| `-l, --list` | No | default list | Target list name |
+| `-p, --priority` | No | `normal` | Priority: `low`, `normal`, `high` |
+| `-d, --due` | No | - | Due date: days (`3`/`3d`) or date (`2026-02-15`) |
+| `-r, --remind` | No | - | Reminder: `3h`/`2d`/`"2026-02-15 14:30"` |
+| `--recur` | No | - | Recurrence: `daily`/`weekdays`/`weekly`/`monthly`, with interval: `daily:2` |
+| `-n, --note` | No | - | Task note/description |
+| `-t, --tags` | No | - | Comma-separated tags |
 
-**Output example:**
-```
-📋 Tasks in list "Work" (2 total):
+**Behavior**: List is auto-created if it doesn't exist.
 
-1. [In Progress] Write documentation ⭐
-2. [In Progress] Review PR
-```
+**Error handling**: Command fails with exit code 1 on invalid date format.
 
-#### `pending` — All incomplete tasks across all lists
+#### `done` / `complete` — Mark task as completed
 
 ```bash
-uv run scripts/ms-todo-sync.py pending [-g]
+todo done <ID or title> [-l "<list>"]
+todo complete <ID or title> [-l "<list>"]  # alias
 ```
 
-| Option | Required | Description |
-|--------|----------|-------------|
-| `-g, --group` | No | Group results by list |
+| Option | Description |
+|--------|-------------|
+| `-l, --list` | List name (optional, searches all lists if omitted) |
 
-**Output example (with `-g`):**
+**Smart detection**: Auto-detects input as ID or title. **Recommended**: Get ID first via `-q` or `-j`.
+
+#### `remove` / `rm` — Delete task
+
+```bash
+todo remove <ID or title> [-l "<list>"] [-y]
+todo rm <ID or title> [-l "<list>"] [-y]  # alias
 ```
-📋 All incomplete tasks (3 total):
 
-📂 Work:
-  [In Progress] Write documentation ⭐
-  [In Progress] Review PR
+| Option | Description |
+|--------|-------------|
+| `-l, --list` | List name (optional, searches all lists if omitted) |
+| `-y, --yes` | Skip confirmation prompt |
 
-📂 Shopping:
-  [In Progress] Buy groceries
+**Smart detection**: Auto-detects input as ID or title. **Recommended**: Get ID first via `-q` or `-j`.
+
+#### `view` / `info` — View task details
+
+```bash
+todo view <ID or title> [-l "<list>"]
+todo info <ID or title> [-l "<list>"]  # alias
+```
+
+| Option | Description |
+|--------|-------------|
+| `-l, --list` | List name (optional, searches all lists if omitted) |
+
+**Smart detection**: Auto-detects input as ID or title. **Recommended**: Get ID first via `-q` or `-j`.
+
+---
+
+### Search and Views
+
+#### `find` / `search` — Search and filter tasks
+
+```bash
+todo find "<keyword>"                    # Search tasks containing keyword
+todo find                                # List all tasks (no keyword = pure filter)
+todo find --incomplete                   # Show only incomplete tasks
+todo find --completed                    # Show only completed tasks
+todo find --created-after "2026-01-01"   # Filter by creation date
+todo find --created-before "2026-04-01"  # Filter by creation date
+todo find --due-after "2026-04-01"        # Filter by due date
+todo find --due-before "2026-04-15"      # Filter by due date
+```
+
+**Combined filter examples:**
+```bash
+# Incomplete tasks due this week
+todo find --due-after "2026-04-13" --due-before "2026-04-19" --incomplete
+
+# Search and show incomplete only
+todo find "report" --incomplete
+
+# Search tasks created in date range
+todo find "project" --created-after "2026-04-01"
+```
+
+| Option | Description |
+|--------|-------------|
+| `keyword` | Search keyword (optional, omit for pure filtering) |
+| `--completed` | Show only completed tasks |
+| `--incomplete` | Show only incomplete tasks |
+| `--created-after` | Filter tasks created after date (YYYY-MM-DD) |
+| `--created-before` | Filter tasks created before date (YYYY-MM-DD) |
+| `--due-after` | Filter tasks due after date (YYYY-MM-DD) |
+| `--due-before` | Filter tasks due before date (YYYY-MM-DD) |
+
+**Note**: `--completed` and `--incomplete` cannot be used together - command will fail.
+
+**JSON output includes applied filters:**
+```json
+{
+  "success": true,
+  "data": {
+    "keyword": "report",
+    "filters": {
+      "completed": null,
+      "incomplete": true,
+      "createdAfter": null,
+      "createdBefore": null,
+      "dueAfter": "2026-04-01",
+      "dueBefore": "2026-04-30"
+    },
+    "total": 5,
+    "results": [...]
+  }
+}
 ```
 
 #### `today` — Tasks due today
 
 ```bash
-uv run scripts/ms-todo-sync.py today
+todo today
+todo -j today  # JSON format
 ```
-
-Lists incomplete tasks with due date matching today. Output: `📅 No tasks due today` if none found.
 
 #### `overdue` — Overdue tasks
 
 ```bash
-uv run scripts/ms-todo-sync.py overdue
+todo overdue
+todo -j overdue  # JSON format
 ```
 
-**Output example:**
-```
-⚠️  Overdue tasks (1 total):
-
-[In Progress] Submit report ⭐
-   List: Work
-   Overdue: 3 days
-```
-
-#### `detail` — View full task details
+#### `pending` / `all` — All incomplete tasks
 
 ```bash
-uv run scripts/ms-todo-sync.py detail "<title>" [-l "<list>"]
+todo pending
+todo pending -g  # Group by list
+todo all  # alias (supports -g too)
 ```
 
-| Option | Required | Default | Description |
-|--------|----------|---------|-------------|
-| `title` | Yes | — | Task title (supports **partial/fuzzy match**) |
-| `-l, --list` | No | (default list) | List name. If not specified, uses your default list. |
-
-When multiple tasks match, returns the most recently modified **incomplete** task. If all matches are completed, returns the most recently modified completed task.
-
-#### `search` — Search tasks by keyword
-
-```bash
-uv run scripts/ms-todo-sync.py search "<keyword>"
-```
-
-Searches across all lists in both task titles and notes (case-insensitive).
-
-**Output example:**
-```
-🔍 Search results (1 found):
-
-[In Progress] Write documentation ⭐
-   List: Work
-```
+| Option | Description |
+|--------|-------------|
+| `-g, --group` | Group results by list |
 
 #### `stats` — Task statistics
 
 ```bash
-uv run scripts/ms-todo-sync.py stats
-```
-
-**Output example:**
-```
-📊 Task Statistics:
-
-  Total lists: 3
-  Total tasks: 15
-  Completed: 10
-  Pending: 5
-  High priority: 2
-  Overdue: 1
-
-  Completion rate: 66.7%
+todo stats
 ```
 
 #### `export` — Export all tasks to JSON
 
 ```bash
-uv run scripts/ms-todo-sync.py export [-o "<filename>"]
+todo export [-o "<filename>"]
 ```
 
-| Option | Required | Default | Description |
-|--------|----------|---------|-------------|
-| `-o, --output` | No | `todo_export.json` | Output file path |
-
-Output: `✓ Tasks exported to: <filename>`
-
----
-
-## Error Handling
-
-### Exit Codes
-
-| Code | Meaning |
-|------|---------|
-| `0` | Success |
-| `1` | Failure (not logged in, API error, invalid arguments, etc.) |
-
-### Common Error Messages
-
-| Error | Cause | Resolution |
-|-------|-------|------------|
-| `❌ Not logged in` | No cached token or token expired | Run `login get` then `login verify` |
-| `ModuleNotFoundError: No module named 'msal'` | Dependencies not installed | Run `uv sync` or `pip install -r requirements.txt` |
-| `❌ List not found: <name>` | Specified list does not exist | Check list name with `lists` command |
-| `❌ Task not found: <name>` | No task with exact matching title | Check task title with `tasks` or `search` |
-| `❌ Error: <message>` | API or network error | Retry; check network; use `--debug` for details |
-
----
-
-## Agent Usage Guidelines
-
-### Critical Rules
-
-1. **Working directory**: Always `cd` to the directory containing this SKILL.md before running commands.
-2. **Dependency installation**: Before first use or when encountering import errors, run `uv sync` to ensure all dependencies are installed.
-3. **Task list organization**: When adding tasks:
-   - First, run `lists` to see available task lists
-   - If user doesn't specify a list, tasks will be added to their **default list** (wellknownListName: "defaultList")
-   - Intelligently categorize tasks into appropriate lists (e.g., "Work", "Personal", "Shopping")
-   - If user mentions a context (work, home, shopping, etc.), use or create an appropriate list
-   - Lists will be auto-created if they don't exist, so feel free to use meaningful list names
-4. **Destructive operations**: For `delete` and `delete-list` commands:
-   - These commands will prompt for confirmation by default (blocking behavior)
-   - Use `-y` flag to skip confirmation ONLY when:
-     - User has explicitly requested to delete without confirmation
-     - The deletion intent is unambiguous and confirmed through conversation
-   - When in doubt, ask the user for confirmation instead of using `-y`
-5. **Global option placement**: `-v` and `--debug` must come BEFORE the subcommand, not after.
-6. **Do not retry `login verify` automatically**: This command blocks waiting for user browser interaction. Only call it after the user confirms completion.
-7. **Check login status first**: Before performing any task operations, run a lightweight command (e.g., `lists`) to verify authentication. Handle the "Not logged in" error gracefully.
-
-### Recommended Workflow for Agents
-
-```
-1. cd <skill_directory>
-2. uv sync                                       # Ensure dependencies are installed (first time or after updates)
-3. uv run scripts/ms-todo-sync.py lists          # Test auth & see available lists
-   → If fails with exit code 1 ("Not logged in"):
-     a. uv run scripts/ms-todo-sync.py login get  # Get code
-     b. Present URL + code to user
-     c. Wait for user confirmation
-     d. uv run scripts/ms-todo-sync.py login verify
-4. When adding tasks:
-   → Analyze task context from user's description
-   → Choose or create appropriate list name:
-     - Work-related → "Work" list
-     - Personal errands → "Personal" list  
-     - Shopping items → "Shopping" list
-     - Project-specific → Use project name as list
-   → Add task with appropriate list via `-l` option
-5. Verify results (e.g., list tasks after adding)
-```
-
-**Example task categorization:**
-- \"Buy milk\" → Shopping list (or default list if no context)
-- \"Prepare report for meeting\" → Work list
-- \"Call dentist\" → Personal list (or default list)
-- \"Review PR for auth service\" → Work or project-specific list
-
-**Note:** If no list is specified, tasks are added to the user's default Microsoft To Do list.
-
-### Task Title Matching
-
-- `complete` and `delete` require **exact title match**.
-- `detail` and `search` support **partial/fuzzy keyword match** (case-insensitive).
-- When in doubt, use `search` first to find the exact title, then use it in subsequent commands.
-
-### Default List Behavior
-
-When `-l` is not specified, the tool uses your Microsoft To Do default list (typically "Tasks"). To target a specific list, provide the `-l` option.
+| Option | Default | Description |
+|--------|---------|-------------|
+| `-o, --output` | `todo_export.json` | Output file path |
 
 ---
 
 ## Quick Examples
 
 ```bash
-# Check existing lists first
-uv run scripts/ms-todo-sync.py lists
+# View all lists
+todo list
 
 # Add task to specific list (list auto-created if needed)
-uv run scripts/ms-todo-sync.py add "Report" -l "Work" -p high -d 3 -D "Q4 financials"
+todo add "Report" -l "Work" -p high -d 3 -n "Q4 Finance"
 
-# Add task to default list (no -l option)
-uv run scripts/ms-todo-sync.py add "Buy milk"
+# Add task to default list
+todo add "Buy milk"
 
-# Add task with reminder in 2 hours
-uv run scripts/ms-todo-sync.py add "Call client" -r 2h
+# Add task with 2-hour reminder
+todo add "Call client" -r 2h
 
-# Add task with specific reminder date and time
-uv run scripts/ms-todo-sync.py add "Meeting" -d 2026-03-15 -r "2026-03-15 14:30"
+# Agent recommended: get ID first, then operate
+todo -q pending          # Get all pending task IDs
+todo -j pending          # Get JSON format (with details)
+todo done <id>           # Complete by ID
+todo remove <id> -y      # Delete by ID
 
-# Add recurring tasks
-uv run scripts/ms-todo-sync.py add "Daily standup" -l "Work" -R daily -d 7
-uv run scripts/ms-todo-sync.py add "Weekly review" -R weekly -d 2026-02-17
-uv run scripts/ms-todo-sync.py add "Gym" -R weekdays -l "Personal"  
-uv run scripts/ms-todo-sync.py add "Monthly report" -R monthly -p high -d 30
-
-# Search then complete (use exact title from search results)
-uv run scripts/ms-todo-sync.py search "report"
-uv run scripts/ms-todo-sync.py complete "Report" -l "Work"
-
-# Delete (use -y only when user intent is clear)
-uv run scripts/ms-todo-sync.py delete "Old task" -y
+# Search then view
+todo find "report"
+todo view "report"
 
 # Views
-uv run scripts/ms-todo-sync.py -v pending -g          # all pending, grouped
-uv run scripts/ms-todo-sync.py -v detail "report"      # task detail with fuzzy match
-uv run scripts/ms-todo-sync.py export -o "backup.json"  # export all
+todo -v pending -g       # All pending, grouped, verbose
+todo -j today            # Today's tasks (JSON)
+todo export -o "backup.json"  # Full export
 ```
 
+---
 
+## v1 to v2 Migration Guide
 
+| v1 Command | v2 Command |
+|------------|------------|
+| `lists` | `list` / `ls` |
+| `create-list` | `list add` / `new-list` |
+| `delete-list` | `list remove` / `rm-list` |
+| `tasks <list>` | `show <list>` / `tasks <list>` |
+| `add` | `add` / `new` |
+| `complete` | `done` / `complete` |
+| `delete` | `remove` / `rm` |
+| `detail` | `view` / `info` |
+| `search` | `find` / `search` |
+| `pending` | `pending` / `all` |
+| `--json` | `-j` / `--json` |
+| `-D, --description` | `-n, --note` |
+| `-r, --reminder` | `-r, --remind` |
+| `-R, --recurrence` | `--recur` |
 
+**New options:**
+- `-q, --quiet` - Quiet mode, ID only output

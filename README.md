@@ -10,11 +10,12 @@ It works in two ways:
 ## Features
 
 - 📋 **List & Task CRUD** — Create, view, delete task lists and tasks
-- 🔍 **Search & Filter** — Full-text search, today/overdue/pending views
-- ⭐ **Priority & Due Dates** — Set importance and deadlines
+- 🔍 **Search & Filter** — Full-text search, filter by status (completed/incomplete), filter by date (created/due)
+- ⭐ **Priority & Due Dates** — Set importance and deadlines with flexible date formats
 - 📊 **Statistics** — Completion rate, overdue count, etc.
 - 📤 **Export** — Dump all tasks to JSON
-- 🔐 **Device Code Auth** — Non-blocking two-step login, agent-friendly
+- 🔐 **Device Code Auth** — Non-blocking single-step login, agent-friendly
+- 🤖 **Agent-Optimized** — JSON output with consistent structure, ID-based operations, proper error handling
 
 ## Prerequisites
 
@@ -26,100 +27,121 @@ It works in two ways:
 ### 1. Clone
 
 ```bash
-git clone https://github.com/<your-username>/ms-todo-sync.git
+git clone https://github.com/xiaoski/ms-todo-sync.git
 cd ms-todo-sync
 ```
 
-### 2. Login
-
-A two-step device code flow — no need to register your own Azure app:
+### 2. Install Dependencies
 
 ```bash
-# Step 1: Get a verification code
-uv run scripts/ms-todo-sync.py login get
-
-# You'll see a URL and a code. Open the URL in your browser,
-# enter the code, and sign in with your Microsoft account.
-
-# Step 2: Complete login
-uv run scripts/ms-todo-sync.py login verify
+uv sync
 ```
+
+### 3. Login
+
+A single-step device code flow — no need to register your own Azure app:
+
+```bash
+todo login
+```
+
+You'll see a URL and a verification code. Open the URL in your browser, enter the code, and sign in with your Microsoft account. Then press Enter in the terminal.
 
 The token is cached to `~/.mstodo_token_cache.json` — you won't need to log in again unless you explicitly log out.
 
-### 3. Use
+### 4. Use
 
 ```bash
 # List all task lists
-uv run scripts/ms-todo-sync.py lists
+todo list
 
 # Add a task
-uv run scripts/ms-todo-sync.py add "Buy groceries" -l "Shopping" -p high -d 2
+todo add "Buy groceries" -l "Shopping" -p high -d 2
 
 # View all pending tasks grouped by list
-uv run scripts/ms-todo-sync.py pending -g
+todo pending -g
 
 # Mark a task as done
-uv run scripts/ms-todo-sync.py complete "Buy groceries" -l "Shopping"
+todo done "Buy groceries" -l "Shopping"
 
-# Search across all lists
-uv run scripts/ms-todo-sync.py search "report"
+# Search tasks
+todo find "report"
+
+# Search with filters (incomplete, due this week)
+todo find --incomplete --due-after "2026-04-13" --due-before "2026-04-19"
 ```
 
 ## Command Overview
 
 | Command | Description |
 |---------|-------------|
-| `lists` | List all task lists |
-| `create-list` | Create a new list |
-| `delete-list` | Delete a list |
-| `tasks` | List tasks in a list |
-| `add` | Add a new task |
-| `complete` | Mark a task as done |
-| `delete` | Delete a task |
-| `detail` | View task details (fuzzy match) |
-| `search` | Search tasks by keyword |
-| `pending` | Show all incomplete tasks |
+| `list` / `ls` | List all task lists |
+| `list add` | Create a new list |
+| `list remove` | Delete a list |
+| `show` / `tasks` | List tasks in a list |
+| `add` / `new` | Add a new task |
+| `done` / `complete` | Mark a task as done |
+| `remove` / `rm` | Delete a task |
+| `view` / `info` | View task details |
+| `find` / `search` | Search and filter tasks |
+| `pending` / `all` | Show all incomplete tasks |
 | `today` | Tasks due today |
 | `overdue` | Overdue tasks |
 | `stats` | Task statistics |
 | `export` | Export to JSON |
-| `login get/verify` | Two-step authentication |
+| `login` | Authentication |
 | `logout` | Clear cached tokens |
 
-Run `uv run scripts/ms-todo-sync.py --help` for full details, or see [SKILL.md](SKILL.md) for the complete reference.
+Run `todo --help` for full details, or see [SKILL.md](SKILL.md) for the complete reference.
 
-## Use as an AI Agent Skill
+## Agent Integration
 
 This project follows the **SKILLS convention** — the [SKILL.md](SKILL.md) file contains everything an AI agent needs to discover and use this tool: command signatures, parameter tables, output formats, error handling, and agent-specific guidelines.
 
 ### Setup for Claude Code
 
-Add the skill directory to your Claude Code configuration:
-
-```bash
-# In your Claude Code project, add this repo as a skill:
-claude mcp add-skill /path/to/ms-todo-sync
-```
-
-Or simply point your agent to the directory containing `SKILL.md`. The agent will automatically:
+Point your agent to the directory containing `SKILL.md`. The agent will automatically:
 
 1. Detect the skill and read its capabilities
 2. Handle authentication by presenting the login URL to you
 3. Execute task operations based on your natural language requests
 
-### Example agent interactions
+### Recommended Agent Workflow
 
-> "Show me all my overdue tasks"  
-> "Add a high-priority task 'Prepare slides' to my Work list, due in 2 days"  
-> "What's my task completion rate?"  
-> "Mark 'Buy groceries' as done"
+```bash
+# 1. Check current state
+todo -j pending          # Get JSON with all task IDs
+
+# 2. Perform operations using IDs (more reliable)
+todo done <id>
+todo remove <id> -y
+
+# 3. Search with filters
+todo find --incomplete --due-after "2026-04-01"
+```
+
+### JSON Output
+
+All commands support `-j/--json` for structured output:
+
+```json
+{
+  "success": true,
+  "data": {
+    "total": 5,
+    "tasks": [
+      {"id": "...", "title": "...", "status": "...", ...}
+    ]
+  },
+  "message": null
+}
+```
 
 ## Project Structure
 
 ```
 ms-todo-sync/
-├── SKILL.md              # AI Agent skill definition (the primary interface doc)
+├── SKILL.md              # AI Agent skill definition (primary interface doc)
 ├── scripts/
 │   └── ms-todo-sync.py   # Main CLI script
 ├── pyproject.toml         # Project metadata & dependencies
