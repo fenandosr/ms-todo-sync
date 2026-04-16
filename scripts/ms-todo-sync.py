@@ -4,22 +4,22 @@ Microsoft To Do API Access Script
 Access To Do lists and tasks using Microsoft Graph API
 
 New CLI Design (v2):
-- todo list/ls              - List all task lists
-- todo list add <name>      - Create new list
-- todo list remove <name>   - Delete list
-- todo show [<list>]        - Show tasks (default or specific list)
-- todo add <title>          - Add new task
-- todo done <id-or-title>   - Mark task as done
-- todo remove <id-or-title> - Delete task
-- todo view <id-or-title>   - View task details
-- todo find <keyword>       - Search tasks
-- todo today                - Show today's tasks
-- todo overdue               - Show overdue tasks
-- todo pending/all           - Show all pending tasks
-- todo stats                 - Show statistics
-- todo export                - Export tasks
-- todo login                 - Login
-- todo logout                - Logout
+- ms-todo-sync.py list/ls              - List all task lists
+- ms-todo-sync.py list add <name>      - Create new list
+- ms-todo-sync.py list remove <name>   - Delete list
+- ms-todo-sync.py show [<list>]        - Show tasks (default or specific list)
+- ms-todo-sync.py add <title>          - Add new task
+- ms-todo-sync.py done <id-or-title>   - Mark task as done
+- ms-todo-sync.py remove <id-or-title> - Delete task
+- ms-todo-sync.py view <id-or-title>   - View task details
+- ms-todo-sync.py find <keyword>       - Search tasks
+- ms-todo-sync.py today                - Show today's tasks
+- ms-todo-sync.py overdue               - Show overdue tasks
+- ms-todo-sync.py pending/all           - Show all pending tasks
+- ms-todo-sync.py stats                 - Show statistics
+- ms-todo-sync.py export                - Export tasks
+- ms-todo-sync.py login                 - Login
+- ms-todo-sync.py logout                - Logout
 """
 
 # type: ignore  # Ignore missing type hints in msal library
