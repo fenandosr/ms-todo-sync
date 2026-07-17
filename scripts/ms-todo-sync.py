@@ -197,7 +197,7 @@ class MicrosoftTodoClient:
             "Authorization": f"Bearer {self.access_token}",
             "Content-Type": "application/json"
         }
-        url = f"{self.graph_endpoint}{endpoint}"
+        url = endpoint if endpoint.startswith("http") else f"{self.graph_endpoint}{endpoint}"
 
         if self.debug:
             self._print_debug_request(method, url, data)
@@ -249,9 +249,18 @@ class MicrosoftTodoClient:
         print(f"  Status Code: {response.status_code}")
         print("  Headers: " + str(dict(response.headers)))
 
+    def _get_all_pages(self, endpoint: str) -> List[Dict[str, Any]]:
+        """GET endpoint and follow @odata.nextLink until exhausted, concatenating `value`."""
+        items: List[Dict[str, Any]] = []
+        next_url: Optional[str] = endpoint
+        while next_url:
+            result = self._make_request(next_url)
+            items.extend(result.get("value", []))
+            next_url = result.get("@odata.nextLink")
+        return items
+
     def get_task_lists(self) -> List[Dict[str, Any]]:
-        result = self._make_request("/me/todo/lists")
-        return result.get("value", [])
+        return self._get_all_pages("/me/todo/lists?$top=100")
 
     def create_task_list(self, display_name: str) -> Dict[str, Any]:
         data = {"displayName": display_name}
@@ -262,8 +271,7 @@ class MicrosoftTodoClient:
         return True
 
     def get_tasks(self, list_id: str) -> List[Dict[str, Any]]:
-        result = self._make_request(f"/me/todo/lists/{list_id}/tasks")
-        return result.get("value", [])
+        return self._get_all_pages(f"/me/todo/lists/{list_id}/tasks?$top=100")
 
     def create_task(
         self,
