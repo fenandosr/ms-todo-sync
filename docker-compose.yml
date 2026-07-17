@@ -1,0 +1,12 @@
+services:
+  ms-todo-sync:
+    build: .
+    image: ms-todo-sync:latest
+    stdin_open: true
+    tty: true
+    volumes:
+      - ms-todo-sync-cache:/root
+    entrypoint: ["python", "scripts/ms-todo-sync.py"]
+
+volumes:
+  ms-todo-sync-cache:
